@@ -67,3 +67,24 @@ export function pickMove(types: TypeName[]): { name: string; type: TypeName } {
   const pool = TYPE_MOVES[t];
   return { name: pool[Math.floor(Math.random() * pool.length)], type: t };
 }
+
+// Smart picker: 70% of the time, pick the attacker type that is most effective
+// against the defender. Falls back to random for variety.
+export function pickSmartMove(
+  attackerTypes: TypeName[],
+  defenderTypes: TypeName[]
+): { name: string; type: TypeName } {
+  if (Math.random() < 0.3) return pickMove(attackerTypes);
+
+  let bestType = attackerTypes[0];
+  let bestMult = -1;
+  for (const t of attackerTypes) {
+    const m = multiplier(t, defenderTypes);
+    if (m > bestMult) {
+      bestMult = m;
+      bestType = t;
+    }
+  }
+  const pool = TYPE_MOVES[bestType];
+  return { name: pool[Math.floor(Math.random() * pool.length)], type: bestType };
+}

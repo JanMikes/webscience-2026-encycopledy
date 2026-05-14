@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { useMemo } from "react";
 import { useGameStore } from "../store/useGameStore";
 import PokemonCard from "../components/PokemonCard";
+import { winChance } from "../lib/battleEngine";
 
 export default function PokedexScreen() {
   const roster = useGameStore((s) => s.roster);
@@ -10,6 +12,12 @@ export default function PokedexScreen() {
   const reset = useGameStore((s) => s.resetSelection);
 
   const both = !!(selected[0] && selected[1]);
+
+  const odds = useMemo(() => {
+    if (!selected[0] || !selected[1]) return null;
+    const p1 = Math.round(winChance(selected[0], selected[1]) * 100);
+    return { p1, p2: 100 - p1 };
+  }, [selected[0]?.id, selected[1]?.id]);
 
   return (
     <div className="absolute inset-0 overflow-y-auto">
@@ -61,10 +69,39 @@ export default function PokedexScreen() {
       <div className="fixed bottom-0 left-0 right-0 z-20 backdrop-blur-md bg-gradient-to-t from-black/90 via-black/70 to-transparent">
         <div className="max-w-[1600px] mx-auto px-8 py-5 flex items-center gap-6">
           <div className="flex items-center gap-3 flex-1">
-            <Slot pokemon={selected[0]} label="P1" color="hot" />
+            <Slot pokemon={selected[0]} label="P1" color="hot" winPct={odds?.p1} />
             <span className="display text-3xl text-white/40">VS</span>
-            <Slot pokemon={selected[1]} label="P2" color="neon" />
+            <Slot pokemon={selected[1]} label="P2" color="neon" winPct={odds?.p2} />
           </div>
+
+          <AnimatePresence>
+            {odds && (
+              <motion.div
+                key="odds-bar"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="hidden md:flex flex-col items-center gap-1 px-4"
+              >
+                <div className="pixel text-[9px] text-white/50 tracking-widest">WIN CHANCE</div>
+                <div className="flex items-baseline gap-3">
+                  <span className="display text-3xl text-hot">{odds.p1}%</span>
+                  <span className="pixel text-[10px] text-white/40">·</span>
+                  <span className="display text-3xl text-neon">{odds.p2}%</span>
+                </div>
+                <div className="relative w-48 h-1.5 rounded-full overflow-hidden bg-white/10">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-hot"
+                    style={{ width: `${odds.p1}%` }}
+                  />
+                  <div
+                    className="absolute inset-y-0 right-0 bg-neon"
+                    style={{ width: `${odds.p2}%` }}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button
             onClick={reset}
@@ -98,20 +135,25 @@ function Slot({
   pokemon,
   label,
   color,
+  winPct,
 }: {
   pokemon: ReturnType<typeof useGameStore.getState>["selected"][number];
   label: string;
   color: "hot" | "neon";
+  winPct?: number;
 }) {
   const bd = color === "hot" ? "border-hot" : "border-neon";
   const tx = color === "hot" ? "text-hot" : "text-neon";
   return (
-    <div className={`flex items-center gap-3 px-3 py-2 border-2 ${bd} rounded-lg min-w-[200px]`}>
+    <div className={`relative flex items-center gap-3 px-3 py-2 border-2 ${bd} rounded-lg min-w-[200px]`}>
       <div className={`pixel text-[10px] ${tx}`}>{label}</div>
       {pokemon ? (
         <>
           <img src={pokemon.artworkUrl} alt={pokemon.name} className="h-12 w-12 object-contain" />
           <div className="display text-lg">{pokemon.name.toUpperCase()}</div>
+          {winPct !== undefined && (
+            <div className={`md:hidden ml-auto display text-base ${tx}`}>{winPct}%</div>
+          )}
         </>
       ) : (
         <div className="pixel text-[10px] text-white/30">WAITING…</div>
